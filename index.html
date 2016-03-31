@@ -1,0 +1,171 @@
+<!doctype html>
+<html>
+<head>
+    <title>Vortex</title>
+    <meta name="description" content="Control a Vortex robot in your browser using Web Bluetooth.">
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1, user-scalable=yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+
+    <!-- Polyfill Web Components support for older browsers -->
+    <script src="bower_components/webcomponentsjs/webcomponents-lite.min.js"></script>
+
+    <!-- Because this project uses vulcanize this should be your only html import
+     in this file. All other imports should go in elements.html -->
+    <link rel="import" href="elements/elements.html">
+
+
+    <script src="scripts/vortex.js"></script>
+    <script src="scripts/app.js"></script>
+</head>
+
+<body>
+    <!--<platinum-https-redirect></platinum-https-redirect>-->
+
+    <template is="dom-bind" id="my-app">
+
+        <div id="cards">
+
+
+            <paper-dialog id="no-bluetooth">
+                <h2>No Web Bluetooth</h2>
+                <p>The Web Bluetooth API is missing. Please enable it at
+                    chrome://flags/#enable-web-bluetooth and try again.</p>
+            </paper-dialog>
+
+            <paper-dialog id="dialog">
+                <h2>Error</h2>
+                <p>Could not connect to bluetooth device!</p>
+            </paper-dialog>
+        </div>
+
+
+        <paper-toolbar class="medium-tall">
+
+            <paper-icon-button icon="menu"></paper-icon-button>
+            <div><paper-toggle-button class="blue" id="connect-toggle">Connect</paper-toggle-button></div>
+
+            <!--
+            <div>Vortex</div>
+            <div><paper-button id="send-reset-button" raised>Send Reset</paper-button></div>
+            -->
+
+            <div class="bottom fit" horizontal layout>
+
+                <paper-tabs selected="0" flex style="max-width: 600px;">
+                    <paper-tab>Moving</paper-tab>
+                    <paper-tab>Dancing</paper-tab>
+                    <paper-tab>Face</paper-tab>
+                    <paper-tab>Colours</paper-tab>
+                    <paper-tab>Music</paper-tab>
+                </paper-tabs>
+
+            </div>
+
+        </paper-toolbar>
+
+        <iron-pages selected="0">
+
+            <!-- Moving page -->
+            <div>
+                <div id="retrostick" class="retrostick">
+                    <div class="retrostick-base">
+                        <div class="retrostick-base-joint">
+                            <div><div></div></div>
+                        </div>
+                        <div class="retrostick-stick-wrap">
+                            <div class="retrostick-stick"></div>
+                        </div>
+                        <div class="retrostick-ball"></div>
+                    </div>
+                </div>
+                <!--
+                <div><paper-toggle-button class="blue" id="pid-toggle">Enable Line Following</paper-toggle-button></div>
+                -->
+            </div>
+
+
+
+            <!-- Dancing page -->
+            <div>
+                <paper-radio-group selected="danceOff" id="dance-group">
+                    <paper-radio-button name="danceOff">No Dancing</paper-radio-button>
+                    <paper-radio-button name="dance1">Dance 1</paper-radio-button>
+                    <paper-radio-button name="dance2">Dance 2</paper-radio-button>
+                    <paper-radio-button name="dance3">Dance 3</paper-radio-button>
+                    <paper-radio-button name="dance4">Dance 4</paper-radio-button>
+                </paper-radio-group>
+            </div>
+
+            <!-- Face page -->
+            <div>
+                <!--
+                <iron-ajax url="conf/eyes.json" last-response="{{data}}" auto></iron-ajax>
+
+                <iron-list items="[[data]]" as="item">
+                    <template>
+                        <div class="item" >
+                            <img class="avatar" src="[[item.image]]" on-tap="faceSelected">
+                        </div>
+                    </template>
+                </iron-list>
+                -->
+
+                <div>Eye pattern</div>
+                <paper-slider id="face-slider" pin editable min="0" max="33" value="1"></paper-slider>
+
+                <div>Eye Colour</div>
+
+                <paper-radio-group selected="red" id="face-colour-group">
+                    <paper-radio-button name="off">Off</paper-radio-button>
+                    <paper-radio-button name="red">Red</paper-radio-button>
+                    <paper-radio-button name="green">Green</paper-radio-button>
+                    <paper-radio-button name="blue">Blue</paper-radio-button>
+                    <paper-radio-button name="yellow">Yellow</paper-radio-button>
+                    <paper-radio-button name="cyan">Cyan</paper-radio-button>
+                    <paper-radio-button name="pink">Pink</paper-radio-button>
+                    <paper-radio-button name="white">White</paper-radio-button>
+                </paper-radio-group>
+
+            </div>
+
+            <!-- Colours page -->
+            <div>
+                <paper-color-input id="top-colours" label="Top Colours" shape="circle" type="hsl"></paper-color-input>
+                <paper-color-input id="bottom-colours" label="Underside Colours" shape="circle" type="hsl"></paper-color-input>
+            </div>
+
+            <!-- Music page -->
+            <div>
+                <paper-radio-group selected="musicOff" id="music-group">
+                    <paper-radio-button name="musicOff">No Music</paper-radio-button>
+                    <paper-radio-button name="music1">Music 1</paper-radio-button>
+                    <paper-radio-button name="music2">Music 2</paper-radio-button>
+                    <paper-radio-button name="music3">Music 3</paper-radio-button>
+                    <paper-radio-button name="music4">Music 4</paper-radio-button>
+                    <paper-radio-button name="music5">Music 5</paper-radio-button>
+                    <paper-radio-button name="music6">Music 6</paper-radio-button>
+                    <paper-radio-button name="music7">Music 7</paper-radio-button>
+                    <paper-radio-button name="rnd">Random</paper-radio-button>
+                </paper-radio-group>
+            </div>
+        </iron-pages>
+
+
+        <platinum-bluetooth-device services-filter='["0000dfb0-0000-1000-8000-00805f9b34fb"]'>
+            <platinum-bluetooth-characteristic service='0000dfb0-0000-1000-8000-00805f9b34fb'
+                                               characteristic='0000dfb1-0000-1000-8000-00805f9b34fb'>
+            </platinum-bluetooth-characteristic>
+        </platinum-bluetooth-device>
+
+
+
+    </template>
+
+
+
+</body>
+</html>
