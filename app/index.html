@@ -22,15 +22,20 @@
 
 <body>
 <div>
-    <button id="connectButton" onclick="setupBluetooth()">Connect</button>
+    <button id="connectButton"">Connect</button>
 </div>
-<br/>
+<hr/>
 <div>
-    <button id="onButton" onclick="ledOnPressed()">LED On</button>
+    <button id="onButton">LED On</button>
+    <button id="offButton">LED Off</button>
 </div>
-<br/>
 <div>
-    <button id="offButton" onclick="ledOffPressed()">LED Off</button>
+    <label> Distance:</label>
+    <label id="distanceLabel">0.00</label>
+</div>
+<div>
+    <label> Line Detected?:</label>
+    <label id="lineDetectedLabel">No</label>
 </div>
 <br/>
 <div id="retrostick" class="retrostick">
@@ -48,6 +53,7 @@
 </div>
 
 
+<hr/>
 <!-- In browser console output for debugging, Caveman Debugging! -->
 <h4>Debug output:</h4>
 <textarea cols="80" rows="16" id="consoleTextArea"></textarea>

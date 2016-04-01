@@ -20,39 +20,28 @@
     var leftMotorSpeed=0, rightMotorSpeed=0;
     var sendJoypadUpdates = false;
 
-
-    function handleError(error) {
-        log("ERROR:" + error);
-    }
-
-    function log(line) {
-        console.log(line);
-        var textarea = document.getElementById('consoleTextArea');
-        var previous_text = textarea.innerHTML;
-        textarea.innerHTML = previous_text + line + "\n";
-        textarea.scrollTop = textarea.scrollHeight;
-
-    }
-    window.onerror = function (msg, url, lineNumber, columnNumber, error) {
-        log('Error: ' + msg + ' Script: ' + url + ' Line: ' + lineNumber);
-        return false;
-    }
-
-    document.addEventListener('WebComponentsReady', function(e) {
-        startApp();
-    });
-
-
+    // These magic hex numbers below conform to the made up standard just for these demos, in a real app you would use
+    // an existing (if the device/protocol exists already) or a custom JavaScript library to hide such details.
+    // These correspond to whe the BLE peripheral device running as a service on the Raspberry Pi
+    // see:
+    var RPIGPIO_PIN23_DIGITAL_LOW_MESSAGE  = [0x00, 0x31, 0x02, 0x17, 0x00];
+    var RPIGPIO_PIN23_DIGITAL_HIGH_MESSAGE = [0x00, 0x31, 0x02, 0x17, 0x01];
 
 
     // ------------------------------------------------------------------------------
-    // On Page load
+    // On Page load,
 
     function startApp() {
 
         // ------------------------------------------------------------------------------
-        // Joystick
+        // DOM event handlers
 
+        // Buttons
+        document.querySelector("#connectButton").addEventListener('click',  setupBluetooth);
+        document.querySelector("#onButton").addEventListener('click',  ledOnPressed);
+        document.querySelector("#offButton").addEventListener('click',  ledOffPressed);
+
+        // Joystick
 
         var joystick = new RetroJoyStick({
             retroStickElement: document.querySelector('#retrostick')
@@ -71,24 +60,28 @@
         }.bind(this));
 
 
-
+        // Timed events
         setInterval( function() {
             if (sendJoypadUpdates) {
                     log(new Date().getTime() + ": " + leftMotorSpeed.toFixed(2) + ", " + rightMotorSpeed.toFixed(2));
-                }
+            }
         }, 1000);
 
     }
 
-    function uartRxNotification(event) {
-        let value = event.target.value;
-        log("RX: + " + value);
+    function uartRxNotification(data) {
+        log("RX: + " + data);
+        if (data.length>=4) {
+            document.querySelector("#distanceLabel").innerHTML = data[2];
+            document.querySelector("#lineDetectedLabel").innerHTML = data[3] ? "Yes":"No";
+        }
+
     }
 
 
     function setupBluetooth() {
         if (navigator.bluetooth == undefined) {
-            handleError('ERROR: Web Bluetooth support not found, please see: https://goo.gl/5p4zNM');
+            handleError('Web Bluetooth support not found, please see: https://goo.gl/5p4zNM');
             return;
         }
 
@@ -105,7 +98,6 @@
                     .then(function (device) {
                         log('> DeviceNAme=' + device.name);
                         log('Connecting to GATT Server...');
-                        sendJoypadUpdates = true;
                         return device.connectGATT(); // This is deprectated, but still necessary in some 'older' browser versions.
                     }).then(function (server) {
                     log('> Found GATT server');
@@ -127,8 +119,7 @@
                     log('> Found read characteristic');
                     readCharacteristic = characteristic;
 
-
-                    deviceReady();
+                    deviceConnected();
 
                     // Listen to device notifications
                     return readCharacteristic.startNotifications().then(function () {
@@ -137,8 +128,7 @@
                             log('> characteristicvaluechanged = ' + event.target.value + ' [' + event.target.value.byteLength + ']');
                             if (event.target.value.byteLength > 0) {
                                 var data = new Uint8Array(event.target.value);
-                                log("Recv data: " + data);
-
+                                uartRxNotification(data);
                             }
                         });
                     });
@@ -147,22 +137,19 @@
         }
     }
 
-    // These magic hex numbers below conform to the made up standard just for these demos, in a real app you would use
-    // an existing (if the device/protocol exists already) or a custom JavaScript library to hide such details.
-    // These correspond to whe the BLE peripheral device running as a service on the Raspberry Pi
-    // see:
+    // ------------------------------------------------------------------------------
+    // Bluetooth utilities
 
     function send(data) {
         log("Sending: " + data);
         return writeCharacteristic.writeValue(new Uint8Array(data));
     }
 
-    var RPIGPIO_PIN23_DIGITAL_OUT_MESSAGE  = [0x00, 0x31, 0x01, 0x17, 0x02];
-    var RPIGPIO_PIN23_DIGITAL_LOW_MESSAGE  = [0x00, 0x31, 0x02, 0x17, 0x00];
-    var RPIGPIO_PIN23_DIGITAL_HIGH_MESSAGE = [0x00, 0x31, 0x02, 0x17, 0x01];
 
-    function deviceReady() {
-        //send(RPIGPIO_PIN23_DIGITAL_OUT_MESSAGE);
+    function deviceConnected() {
+        log("Device connected");
+        sendJoypadUpdates = true;
+
     }
 
     function ledOnPressed() {
@@ -173,10 +160,33 @@
         send(RPIGPIO_PIN23_DIGITAL_LOW_MESSAGE);
     }
 
-    // Hacky export...
 
-    document.setupBluetooth = setupBluetooth;
-    document.ledOnPressed   = ledOnPressed;
-    document.ledOffPressed  = ledOffPressed;
+
+    // ------------------------------------------------------------------------------
+    // Browser helpers
+
+    function handleError(error) {
+        log("ERROR:" + error);
+    }
+
+    function log(line) {
+        console.log(line);
+        var textarea = document.getElementById('consoleTextArea');
+        var previous_text = textarea.innerHTML;
+        textarea.innerHTML = previous_text + line + "\n";
+        textarea.scrollTop = textarea.scrollHeight;
+
+    }
+    window.onerror = function (msg, url, lineNumber, columnNumber, error) {
+        handleError( msg + ' Script: ' + url + ' Line: ' + lineNumber);
+        return false;
+    }
+
+    document.addEventListener('WebComponentsReady', function(e) {
+        startApp();
+    });
+
+
+
 })(document);
 
