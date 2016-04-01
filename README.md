@@ -10,7 +10,7 @@ Browse to the live demo using Chromium (49+) at [https://thebubbleworks.github.i
 
 # Developer Notes
 
-after cloneing this repostiory
+after cloning this repostiory
 
 Dev time dependanies
 

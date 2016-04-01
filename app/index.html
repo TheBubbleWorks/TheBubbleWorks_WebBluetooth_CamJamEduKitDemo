@@ -1,8 +1,8 @@
 <!doctype html>
 <html>
 <head>
-    <title>Vortex</title>
-    <meta name="description" content="Control a Vortex robot in your browser using Web Bluetooth.">
+    <title>CamJam EduKit Robot</title>
+    <meta name="description" content="Control a CAmJam EduKit Robot Web Bluetooth.">
 
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
@@ -16,168 +16,173 @@
     <!-- Because this project uses vulcanize this should be your only html import
      in this file. All other imports should go in elements.html -->
     <link rel="import" href="elements/elements.html">
-
-
-    <script src="scripts/vortex.js"></script>
     <script src="scripts/app.js"></script>
 
     <script>
-        fucntion () {
         function uartRxNotification(event) {
-        let value = event.target.value;
-            console.log("RX: + " + value);
+            let value = event.target.value;
+            log("RX: + " + value);
         }
     </script>
+
+    <script>
+        // see: http://blog.getsentry.com/2016/01/04/client-javascript-reporting-window-onerror.html
+        function wrapErrors(fn) {
+            // don't wrap function more than once
+            if (!fn.__wrapped__) {
+                fn.__wrapped__ = function () {
+                    try {
+                        return fn.apply(this, arguments);
+                    } catch (e) {
+                        log(e); // report the error
+                        throw e; // re-throw the error
+                    }
+                };
+            }
+
+            return fn.__wrapped__;
+        }
+
+        function log(line) {
+            console.log(line);
+            var textarea = document.getElementById('consoleTextArea');
+            previous_text = textarea.innerHTML;
+            textarea.innerHTML = previous_text + line + "\n";
+            textarea.scrollTop = textarea.scrollHeight;
+
+        }
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            log('Error: ' + msg + ' Script: ' + url + ' Line: ' + lineNumber);
+            return false;
+        }
+    </script>
+
+
 </head>
 
 <body>
-    <!--<platinum-https-redirect></platinum-https-redirect>-->
+<body>
+<div>
+    <button id="connectButton" onclick="setupBluetooth()">Connect</button>
+</div>
+<br/>
+<div>
+    <button id="onButton" onclick="ledOnPressed()">LED On</button>
+</div>
+<br/>
+<div>
+    <button id="offButton" onclick="ledOffPressed()">LED Off</button>
+</div>
+<br/>
 
-    <template is="dom-bind" id="my-app">
+<script>
+    // These 128-Bit ID's correspond to the Nordic Semi-conductor 'UART' BLE service which is used by Adafruit and others.
+    var UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+    var UART_CHAR_RX_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+    var UART_CHAR_TX_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
 
-        <div id="cards">
+    var connected = false;
+    var gattServer = null;
+    var uartService = null;
+    var writeCharacteristic = null;
+    var readCharacteristic = null;
 
+    function handleError(error) {
+        log("ERROR:" + error);
+    }
 
-            <paper-dialog id="no-bluetooth">
-                <h2>No Web Bluetooth</h2>
-                <p>The Web Bluetooth API is missing. Please enable it at
-                    chrome://flags/#enable-web-bluetooth and try again.</p>
-            </paper-dialog>
+    function setupBluetooth() {
+        if (navigator.bluetooth == undefined) {
+            handleError('ERROR: Web Bluetooth support not found, please see: https://goo.gl/5p4zNM');
+            return;
+        }
 
-            <paper-dialog id="dialog">
-                <h2>Error</h2>
-                <p>Could not connect to bluetooth device!</p>
-            </paper-dialog>
-        </div>
-
-
-        <paper-toolbar class="medium-tall">
-
-            <paper-icon-button icon="menu"></paper-icon-button>
-            <div><paper-toggle-button class="blue" id="connect-toggle">Connect</paper-toggle-button></div>
-
-            <!--
-            <div>Vortex</div>
-            <div><paper-button id="send-reset-button" raised>Send Reset</paper-button></div>
-            -->
-
-            <div class="bottom fit" horizontal layout>
-
-                <paper-tabs selected="0" flex style="max-width: 600px;">
-                    <paper-tab>Moving</paper-tab>
-                    <paper-tab>Dancing</paper-tab>
-                    <paper-tab>Face</paper-tab>
-                    <paper-tab>Colours</paper-tab>
-                    <paper-tab>Music</paper-tab>
-                </paper-tabs>
-
-            </div>
-
-        </paper-toolbar>
-
-        <iron-pages selected="0">
-
-            <!-- Moving page -->
-            <div>
-                <div id="retrostick" class="retrostick">
-                    <div class="retrostick-base">
-                        <div class="retrostick-base-joint">
-                            <div><div></div></div>
-                        </div>
-                        <div class="retrostick-stick-wrap">
-                            <div class="retrostick-stick"></div>
-                        </div>
-                        <div class="retrostick-ball"></div>
-                    </div>
-                </div>
-                <!--
-                <div><paper-toggle-button class="blue" id="pid-toggle">Enable Line Following</paper-toggle-button></div>
-                -->
-            </div>
-
-
-
-            <!-- Dancing page -->
-            <div>
-                <paper-radio-group selected="danceOff" id="dance-group">
-                    <paper-radio-button name="danceOff">No Dancing</paper-radio-button>
-                    <paper-radio-button name="dance1">Dance 1</paper-radio-button>
-                    <paper-radio-button name="dance2">Dance 2</paper-radio-button>
-                    <paper-radio-button name="dance3">Dance 3</paper-radio-button>
-                    <paper-radio-button name="dance4">Dance 4</paper-radio-button>
-                </paper-radio-group>
-            </div>
-
-            <!-- Face page -->
-            <div>
-                <!--
-                <iron-ajax url="conf/eyes.json" last-response="{{data}}" auto></iron-ajax>
-
-                <iron-list items="[[data]]" as="item">
-                    <template>
-                        <div class="item" >
-                            <img class="avatar" src="[[item.image]]" on-tap="faceSelected">
-                        </div>
-                    </template>
-                </iron-list>
-                -->
-
-                <div>Eye pattern</div>
-                <paper-slider id="face-slider" pin editable min="0" max="33" value="1"></paper-slider>
-
-                <div>Eye Colour</div>
-
-                <paper-radio-group selected="red" id="face-colour-group">
-                    <paper-radio-button name="off">Off</paper-radio-button>
-                    <paper-radio-button name="red">Red</paper-radio-button>
-                    <paper-radio-button name="green">Green</paper-radio-button>
-                    <paper-radio-button name="blue">Blue</paper-radio-button>
-                    <paper-radio-button name="yellow">Yellow</paper-radio-button>
-                    <paper-radio-button name="cyan">Cyan</paper-radio-button>
-                    <paper-radio-button name="pink">Pink</paper-radio-button>
-                    <paper-radio-button name="white">White</paper-radio-button>
-                </paper-radio-group>
-
-            </div>
-
-            <!-- Colours page -->
-            <div>
-                <paper-color-input id="top-colours" label="Top Colours" shape="circle" type="hsl"></paper-color-input>
-                <paper-color-input id="bottom-colours" label="Underside Colours" shape="circle" type="hsl"></paper-color-input>
-            </div>
-
-            <!-- Music page -->
-            <div>
-                <paper-radio-group selected="musicOff" id="music-group">
-                    <paper-radio-button name="musicOff">No Music</paper-radio-button>
-                    <paper-radio-button name="music1">Music 1</paper-radio-button>
-                    <paper-radio-button name="music2">Music 2</paper-radio-button>
-                    <paper-radio-button name="music3">Music 3</paper-radio-button>
-                    <paper-radio-button name="music4">Music 4</paper-radio-button>
-                    <paper-radio-button name="music5">Music 5</paper-radio-button>
-                    <paper-radio-button name="music6">Music 6</paper-radio-button>
-                    <paper-radio-button name="music7">Music 7</paper-radio-button>
-                    <paper-radio-button name="rnd">Random</paper-radio-button>
-                </paper-radio-group>
-            </div>
-        </iron-pages>
+        if (gattServer != null && gattServer.connected) {
+            //disconnect();
+        } else {
+            log('Connecting...');
+            if (readCharacteristic == null) {
+                navigator.bluetooth.requestDevice({
+                            filters: [{
+                                services: [UART_SERVICE_UUID]
+                            }]
+                        })
+                        .then(function (device) {
+                            log('> DeviceNAme=' + device.name);
+                            log('Connecting to GATT Server...');
+                            return device.connectGATT(); // This is deprectated, but still necessary in some 'older' browser versions.
+                        }).then(function (server) {
+                    log('> Found GATT server');
+                    gattServer = server;
+                    // Get UART service
+                    return gattServer.getPrimaryService(UART_SERVICE_UUID);
+                }).then(function (service) {
+                    log('> Found event service');
+                    uartService = service;
+                    // Get write characteristic
+                    return uartService.getCharacteristic(UART_CHAR_TX_UUID);
+                }).then(function (characteristic) {
+                    log('> Found write characteristic');
+                    writeCharacteristic = characteristic;
+                    // Get read characteristic
+                    return uartService.getCharacteristic(UART_CHAR_RX_UUID);
+                }).then(function (characteristic) {
+                    connected = true;
+                    log('> Found read characteristic');
+                    readCharacteristic = characteristic;
 
 
-        <platinum-bluetooth-device services-filter='["6e400001-b5a3-f393-e0a9-e50e24dcca9e"]'>
-            <platinum-bluetooth-characteristic service='6e400001-b5a3-f393-e0a9-e50e24dcca9e'
-                                               characteristic='6e400002-b5a3-f393-e0a9-e50e24dcca9e'>
-            </platinum-bluetooth-characteristic>
-            <platinum-bluetooth-characteristic service='6e400001-b5a3-f393-e0a9-e50e24dcca9e'
-                                               characteristic='6e400003-b5a3-f393-e0a9-e50e24dcca9e'
-                                               on-value-changed='uartRxNotification'>
-            </platinum-bluetooth-characteristic>
-        </platinum-bluetooth-device>
+                    deviceReady();
+
+                    // Listen to device notifications
+                    return readCharacteristic.startNotifications().then(function () {
+
+                        readCharacteristic.addEventListener('characteristicvaluechanged', function (event) {
+                            log('> characteristicvaluechanged = ' + event.target.value + ' [' + event.target.value.byteLength + ']');
+                            if (event.target.value.byteLength > 0) {
+                                var data = new Uint8Array(event.target.value);
+                                log("Recv data: " + data);
+
+                            }
+                        });
+                    });
+                }).catch(handleError);
+            }
+        }
+    }
+
+    // These magic hex numbers below conform to the made up standard just for these demos, in a real app you would use
+    // an existing (if the device/protocol exists already) or a custom JavaScript library to hide such details.
+    // These correspond to whe the BLE peripheral device running as a service on the Raspberry Pi
+    // see:
+
+    function send(data) {
+        log("Sending: " + data);
+        return writeCharacteristic.writeValue(new Uint8Array(data));
+    }
+
+    var RPIGPIO_PIN23_DIGITAL_OUT_MESSAGE  = [0x00, 0x31, 0x01, 0x17, 0x02];
+    var RPIGPIO_PIN23_DIGITAL_LOW_MESSAGE  = [0x00, 0x31, 0x02, 0x17, 0x00];
+    var RPIGPIO_PIN23_DIGITAL_HIGH_MESSAGE = [0x00, 0x31, 0x02, 0x17, 0x01];
+
+    function deviceReady() {
+        //send(RPIGPIO_PIN23_DIGITAL_OUT_MESSAGE);
+    }
+
+    function ledOnPressed() {
+        send(RPIGPIO_PIN23_DIGITAL_HIGH_MESSAGE);
+    }
+
+    function ledOffPressed() {
+        send(RPIGPIO_PIN23_DIGITAL_LOW_MESSAGE);
+    }
+</script>
 
 
 
-    </template>
-
-
+    <!-- In browser console output for debugging, Caveman Debugging! -->
+    <h4>Debug output:</h4>
+    <textarea cols="80" rows="16" id="consoleTextArea" ></textarea>
 
 </body>
 </html>
