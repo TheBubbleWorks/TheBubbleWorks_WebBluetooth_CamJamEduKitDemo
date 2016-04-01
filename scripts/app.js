@@ -2,186 +2,46 @@
 
 (function(document) {
 
-    document.addEventListener('WebComponentsReady', function(e) {
-        startApp();
-    });
+    // Bluetooth settings
+    // These 128-Bit ID's correspond to the Nordic Semi-conductor 'UART' BLE service which is used by Adafruit and others.
+    var UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+    var UART_CHAR_RX_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+    var UART_CHAR_TX_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+
+    // Bluetooth State
+    var connected = false;
+    var gattServer = null;
+    var uartService = null;
+    var writeCharacteristic = null;
+    var readCharacteristic = null;
+
+
+    // App state
+    var leftMotorSpeed=0, rightMotorSpeed=0;
+    var sendJoypadUpdates = false;
+
+    // These magic hex numbers below conform to the made up standard just for these demos, in a real app you would use
+    // an existing (if the device/protocol exists already) or a custom JavaScript library to hide such details.
+    // These correspond to whe the BLE peripheral device running as a service on the Raspberry Pi
+    // see:
+    var RPIGPIO_PIN23_DIGITAL_LOW_MESSAGE  = [0x00, 0x31, 0x02, 0x17, 0x00];
+    var RPIGPIO_PIN23_DIGITAL_HIGH_MESSAGE = [0x00, 0x31, 0x02, 0x17, 0x01];
 
 
     // ------------------------------------------------------------------------------
-    // On Page load
+    // On Page load,
 
     function startApp() {
-        var leftMotorSpeed=0, rightMotorSpeed=0;
-        var sendJoypadUpdates = false;
-
-        Polymer({
-            is: 'my-app',
-        });
-
-        var app = document.querySelector('#my-app');
-
-
-        if (navigator.bluetooth == undefined) {
-            document.getElementById("no-bluetooth").open();
-        }
-
 
         // ------------------------------------------------------------------------------
-        // UI Events
+        // DOM event handlers
 
-        // Tabs & Pages
+        // Buttons
+        document.querySelector("#connectButton").addEventListener('click',  setupBluetooth);
+        document.querySelector("#onButton").addEventListener('click',  ledOnPressed);
+        document.querySelector("#offButton").addEventListener('click',  ledOffPressed);
 
-        var pages = document.querySelector('iron-pages');
-        var tabs = document.querySelector('paper-tabs');
-
-        tabs.addEventListener('iron-select', function() {
-            pages.selected = tabs.selected;
-            console.log(pages.selected);
-            if (pages.selected == "0" ) {
-               sendJoypadUpdates = vortex.isConnected();
-            } else {
-                sendJoypadUpdates = false;
-            }
-        });
-
-
-        // Face Change
-
-        document.querySelector('#face-slider').addEventListener('value-change', function(event) {
-            vortex.setFace(event.target.value);
-        });
-
-
-        var faceColourGroup = document.querySelector('#face-colour-group');
-        faceColourGroup.addEventListener('iron-select', function() {
-            var colour = faceColourGroup.selected;
-            console.log("Face colour selected:" + colour);
-            vortex.setFaceColour(colour);
-        });
-
-
-        // Dance Group
-
-        var danceGroup = document.querySelector('#dance-group');
-        danceGroup.addEventListener('iron-select', function() {
-            var dance = danceGroup.selected;
-            console.log("dance selected:" + dance);
-            switch (dance) {
-                case "danceOff": vortex.stopDance(); break;
-                case "dance1": vortex.startDance(0); break;
-                case "dance2": vortex.startDance(1); break;
-                case "dance3": vortex.startDance(2); break;
-                case "dance4": vortex.startDance(3); break;
-                default:    vortex.stopDance();
-            }
-        });
-
-
-        // Music Group
-
-        var musicGroup = document.querySelector('#music-group');
-        musicGroup.addEventListener('iron-select', function() {
-            var music = musicGroup.selected;
-            console.log("music selected:" + music);
-            switch (music) {
-                case "musicOff": vortex.stopMusic(); break;
-                case "music1": vortex.startMusic(1); break;
-                case "music2": vortex.startMusic(2); break;
-                case "music3": vortex.startMusic(3); break;
-                case "music4": vortex.startMusic(4); break;
-                case "music5": vortex.startMusic(5); break;
-                case "music6": vortex.startMusic(6); break;
-                case "music7": vortex.startMusic(7); break;
-                case "rnd": vortex.startMusic(Math.floor(Math.random() * (256 - 1) + 1)); break; // 1 to 255
-                default:    vortex.stopMusic();
-            }
-        });
-
-
-        // Colour Selectors
-
-        // the paper-colour-picker components fires 4 individual events for r, g, b and alpha for a single colour change
-        // TODO: investigate how to listen to a composite colour change event
-
-        var topColourPicker = document.querySelector('#top-colours');
-        topColourPicker.addEventListener('value-changed', function(){
-            //var normalizedEvent = Polymer.dom(event);
-            //console.info('rootTarget is:', normalizedEvent.rootTarget);
-            //console.info('localTarget is:', normalizedEvent.localTarget);
-            //console.info('path is:', normalizedEvent.path);
-            console.log("Top Colour: " + event.detail.value);
-            var r = topColourPicker.value.red;
-            var g = topColourPicker.value.green;
-            var b = topColourPicker.value.blue;
-            console.log(r,g,b);
-            vortex.setTopLED(Vortex.LED.LED_ALL, r, g, b);
-        });
-
-
-        var bottomColourPicker = document.querySelector('#bottom-colours');
-        bottomColourPicker.addEventListener('value-changed', function(){
-            console.log("Bottom Colour: " + event.detail.value);
-            var r = bottomColourPicker.value.red;
-            var g = bottomColourPicker.value.green;
-            var b = bottomColourPicker.value.blue;
-            console.log(r,g,b);
-            vortex.setBottomLED(Vortex.LED.LED_ALL, r, g, b);
-        });
-
-
-        /*
-         var resetButton = document.getElementById("send-reset-button");
-         if (resetButton) {
-         resetButton.addEventListener('click', function () {
-         bluetoothDevice.request().then(function () {
-         vortex.reset();
-         }).catch(onError);
-         });
-         }*/
-
-        /*
-         var lineFollowButton = document.getElementById("pid-toggle");
-         lineFollowButton.addEventListener('click', function() {
-         console.log(lineFollowButton.checked);
-         vortex.setPidEnabled(lineFollowButton.checked);
-         sendJoypadUpdates = !lineFollowButton.checked;
-         });*/
-
-
-
-        // ------------------------------------------------------------------------------
-        // Bluetooth LE (mostly bolierplate)
-
-        var bluetoothDevice = document.querySelector('platinum-bluetooth-device');
-        var bluetoothWriteCharacteristic = document.querySelector('platinum-bluetooth-characteristic');
-        var bluetoothReadCharacteristic = document.querySelector('platinum-bluetooth-characteristic');
-
-        var vortex = new Vortex(bluetoothDevice, bluetoothWriteCharacteristic, bluetoothReadCharacteristic);
-
-        document.vortex = vortex; // current workaround to give legacy Vortex JS access.
-
-
-        var connectButton = document.getElementById("connect-toggle");
-        connectButton.addEventListener('click', function() {
-            console.log("Connecting");
-
-            bluetoothDevice.request().then(function(device) {
-                //console.log(device);
-                vortex.onConnect(device);
-                sendJoypadUpdates = true;       // assumes we start on the Joypad tab
-
-            }).catch(onError);
-        });
-
-
-        function onError(error) {
-            console.log("ERROR: " + error);
-        }
-
-
-        // ------------------------------------------------------------------------------
         // Joystick
-
 
         var joystick = new RetroJoyStick({
             retroStickElement: document.querySelector('#retrostick')
@@ -192,23 +52,145 @@
 
             var y = (Math.cos(stick.angle * (Math.PI / 180))  * stick.distance) / 100;
             var x = (Math.sin(stick.angle * (Math.PI / 180))  * stick.distance) / 100;
-            leftMotorSpeed = (y + x) * 127;
-            rightMotorSpeed = (y - x) * 127;
+            leftMotorSpeed  =  (y + x) * 100;
+            rightMotorSpeed =  (y - x) * -100;
 
             //console.log( new Date().getTime() + ": " +stick.angle, stick.distance + " => " + x, y, ": " +leftMotorSpeed.toFixed(2), rightMotorSpeed.toFixed(2));
 
         }.bind(this));
 
 
-
+        // Timed events
         setInterval( function() {
             if (sendJoypadUpdates) {
-                    vortex.setMotorSpeeds(leftMotorSpeed, rightMotorSpeed);
-                    //console.log(new Date().getTime() + ": " + leftMotorSpeed.toFixed(2), rightMotorSpeed.toFixed(2));
-                }
-        }, 200);
+                log(new Date().getTime() + ": " + leftMotorSpeed.toFixed(2) + ", " + rightMotorSpeed.toFixed(2));
+                sendJoypadUpdate(leftMotorSpeed, rightMotorSpeed);
+            }
+        }, 1000);
 
     }
+
+    function uartRxNotification(data) {
+        log("RX: + " + data);
+        if (data.length>=4) {
+            document.querySelector("#distanceLabel").innerHTML = data[2];
+            document.querySelector("#lineDetectedLabel").innerHTML = data[3] ? "Yes":"No";
+        }
+
+    }
+
+    function setupBluetooth() {
+        if (navigator.bluetooth == undefined) {
+            handleError('Web Bluetooth support not found, please see: https://goo.gl/5p4zNM');
+            return;
+        }
+
+        if (gattServer != null && gattServer.connected) {
+            //disconnect();
+        } else {
+            log('Connecting...');
+            if (readCharacteristic == null) {
+                navigator.bluetooth.requestDevice({
+                        filters: [{
+                            services: [UART_SERVICE_UUID]
+                        }]
+                    })
+                    .then(function (device) {
+                        log('> DeviceNAme=' + device.name);
+                        log('Connecting to GATT Server...');
+                        return device.connectGATT(); // This is deprectated, but still necessary in some 'older' browser versions.
+                    }).then(function (server) {
+                    log('> Found GATT server');
+                    gattServer = server;
+                    // Get UART service
+                    return gattServer.getPrimaryService(UART_SERVICE_UUID);
+                }).then(function (service) {
+                    log('> Found event service');
+                    uartService = service;
+                    // Get write characteristic
+                    return uartService.getCharacteristic(UART_CHAR_TX_UUID);
+                }).then(function (characteristic) {
+                    log('> Found write characteristic');
+                    writeCharacteristic = characteristic;
+                    // Get read characteristic
+                    return uartService.getCharacteristic(UART_CHAR_RX_UUID);
+                }).then(function (characteristic) {
+                    connected = true;
+                    log('> Found read characteristic');
+                    readCharacteristic = characteristic;
+
+                    deviceConnected();
+
+                    // Listen to device notifications
+                    return readCharacteristic.startNotifications().then(function () {
+
+                        readCharacteristic.addEventListener('characteristicvaluechanged', function (event) {
+                            log('> characteristicvaluechanged = ' + event.target.value + ' [' + event.target.value.byteLength + ']');
+                            if (event.target.value.byteLength > 0) {
+                                var data = new Uint8Array(event.target.value);
+                                uartRxNotification(data);
+                            }
+                        });
+                    });
+                }).catch(handleError);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------------
+    // Bluetooth utilities
+
+    function send(data) {
+        log("Sending: " + data);
+        return writeCharacteristic.writeValue(new Uint8Array(data));
+    }
+
+
+    function deviceConnected() {
+        log("Device connected");
+        connected = true;
+        sendJoypadUpdates = true;
+
+    }
+
+    function ledOnPressed() {
+        send(RPIGPIO_PIN23_DIGITAL_HIGH_MESSAGE);
+    }
+
+    function ledOffPressed() {
+        send(RPIGPIO_PIN23_DIGITAL_LOW_MESSAGE);
+    }
+
+    function sendJoypadUpdate(x, y) {
+        send([0x00, 0x04, leftMotorSpeed+100, rightMotorSpeed+100 ])
+    }
+
+
+    // ------------------------------------------------------------------------------
+    // Browser helpers
+
+    function handleError(error) {
+        log("ERROR:" + error);
+    }
+
+    function log(line) {
+        console.log(line);
+        var textarea = document.getElementById('consoleTextArea');
+        var previous_text = textarea.innerHTML;
+        textarea.innerHTML = previous_text + line + "\n";
+        textarea.scrollTop = textarea.scrollHeight;
+
+    }
+    window.onerror = function (msg, url, lineNumber, columnNumber, error) {
+        handleError( msg + ' Script: ' + url + ' Line: ' + lineNumber);
+        return false;
+    }
+
+    document.addEventListener('WebComponentsReady', function(e) {
+        startApp();
+    });
+
+
 
 })(document);
 
