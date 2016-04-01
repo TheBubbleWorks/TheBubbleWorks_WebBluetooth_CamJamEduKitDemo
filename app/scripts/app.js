@@ -52,8 +52,8 @@
 
             var y = (Math.cos(stick.angle * (Math.PI / 180))  * stick.distance) / 100;
             var x = (Math.sin(stick.angle * (Math.PI / 180))  * stick.distance) / 100;
-            leftMotorSpeed = (y + x) * 127;
-            rightMotorSpeed = (y - x) * 127;
+            leftMotorSpeed  =  (y + x) * 100;
+            rightMotorSpeed =  (y - x) * -100;
 
             //console.log( new Date().getTime() + ": " +stick.angle, stick.distance + " => " + x, y, ": " +leftMotorSpeed.toFixed(2), rightMotorSpeed.toFixed(2));
 
@@ -63,7 +63,8 @@
         // Timed events
         setInterval( function() {
             if (sendJoypadUpdates) {
-                    log(new Date().getTime() + ": " + leftMotorSpeed.toFixed(2) + ", " + rightMotorSpeed.toFixed(2));
+                log(new Date().getTime() + ": " + leftMotorSpeed.toFixed(2) + ", " + rightMotorSpeed.toFixed(2));
+                sendJoypadUpdate(leftMotorSpeed, rightMotorSpeed);
             }
         }, 1000);
 
@@ -77,7 +78,6 @@
         }
 
     }
-
 
     function setupBluetooth() {
         if (navigator.bluetooth == undefined) {
@@ -148,6 +148,7 @@
 
     function deviceConnected() {
         log("Device connected");
+        connected = true;
         sendJoypadUpdates = true;
 
     }
@@ -160,6 +161,9 @@
         send(RPIGPIO_PIN23_DIGITAL_LOW_MESSAGE);
     }
 
+    function sendJoypadUpdate(x, y) {
+        send([0x00, 0x04, leftMotorSpeed+100, rightMotorSpeed+100 ])
+    }
 
 
     // ------------------------------------------------------------------------------
