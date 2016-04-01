@@ -1,6 +1,9 @@
 'use strict';
 
+
 (function(document) {
+
+    var JOYPAD_UPDATE_INTERVAL_MS = 250;
 
     // Bluetooth settings
     // These 128-Bit ID's correspond to the Nordic Semi-conductor 'UART' BLE service which is used by Adafruit and others.
@@ -66,7 +69,7 @@
                 log(new Date().getTime() + ": " + leftMotorSpeed.toFixed(2) + ", " + rightMotorSpeed.toFixed(2));
                 sendJoypadUpdate(leftMotorSpeed, rightMotorSpeed);
             }
-        }, 1000);
+        }, JOYPAD_UPDATE_INTERVAL_MS);
 
     }
 
