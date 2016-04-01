@@ -1,4 +1,4 @@
-# CamJam EdiKit 3 - Web Bluetooth Demo
+# CamJam EduKit 3 - Web Bluetooth Demo
 
 Browse to the live demo using Chromium (49+) at [https://thebubbleworks.github.io/TheBubbleWorks_WebBluetooth_CamJamEduKitDemo](https://thebubbleworks.github.io/TheBubbleWorks_WebBluetooth_CamJamEduKitDemo)
 
